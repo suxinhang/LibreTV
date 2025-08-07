@@ -1,24 +1,23 @@
 // 密码保护功能
 
+// 固定密码 (SHA-256 哈希值)
+const FIXED_PASSWORD_HASH = 'f0e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b'; // 20220828
+
 /**
  * 检查是否设置了密码保护
- * 通过读取页面上嵌入的环境变量来检查
+ * 使用固定密码保护
  */
 function isPasswordProtected() {
-    // 只检查普通密码
-    const pwd = window.__ENV__ && window.__ENV__.PASSWORD;
-    
-    // 检查普通密码是否有效
-    return typeof pwd === 'string' && pwd.length === 64 && !/^0+$/.test(pwd);
+    // 始终启用密码保护
+    return true;
 }
 
 /**
  * 检查是否强制要求设置密码
- * 如果没有设置有效的 PASSWORD，则认为需要强制设置密码
- * 为了安全考虑，所有部署都必须设置密码
+ * 始终要求密码验证
  */
 function isPasswordRequired() {
-    return !isPasswordProtected();
+    return !isPasswordVerified();
 }
 
 /**
@@ -45,17 +44,14 @@ window.isPasswordRequired = isPasswordRequired;
  */
 async function verifyPassword(password) {
     try {
-        const correctHash = window.__ENV__?.PASSWORD;
-        if (!correctHash) return false;
-
         const inputHash = await sha256(password);
-        const isValid = inputHash === correctHash;
+        const isValid = inputHash === FIXED_PASSWORD_HASH;
 
         if (isValid) {
             localStorage.setItem(PASSWORD_CONFIG.localStorageKey, JSON.stringify({
                 verified: true,
                 timestamp: Date.now(),
-                passwordHash: correctHash
+                passwordHash: FIXED_PASSWORD_HASH
             }));
         }
         return isValid;
@@ -68,15 +64,12 @@ async function verifyPassword(password) {
 // 验证状态检查
 function isPasswordVerified() {
     try {
-        if (!isPasswordProtected()) return true;
-
         const stored = localStorage.getItem(PASSWORD_CONFIG.localStorageKey);
         if (!stored) return false;
 
         const { timestamp, passwordHash } = JSON.parse(stored);
-        const currentHash = window.__ENV__?.PASSWORD;
 
-        return timestamp && passwordHash === currentHash &&
+        return timestamp && passwordHash === FIXED_PASSWORD_HASH &&
             Date.now() - timestamp < PASSWORD_CONFIG.verificationTTL;
     } catch (error) {
         console.error('检查密码验证状态时出错:', error);

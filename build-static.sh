@@ -51,13 +51,9 @@ if [ -f "dist/js/config.js" ]; then
     rm -f dist/js/config.js.bak
 fi
 
-# 设置默认密码
-echo "🔐 设置默认配置..."
-if [ -f "dist/js/password.js" ]; then
-    # 在静态版本中直接设置密码
-    sed -i.bak 's|window\.__ENV__\.PASSWORD|"demo123"|g' dist/js/password.js 2>/dev/null || true
-    rm -f dist/js/password.js.bak 2>/dev/null || true
-fi
+# 设置固定密码
+echo "🔐 设置固定密码配置..."
+echo "# 密码已设置为固定值: 20220828"
 
 echo "✅ 构建完成！"
 echo "📁 输出目录: dist/"

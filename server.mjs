@@ -12,9 +12,13 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// 固定密码配置
+const FIXED_PASSWORD = '20220828';
+const FIXED_PASSWORD_HASH = 'f0e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b';
+
 const config = {
   port: process.env.PORT || 8080,
-  password: process.env.PASSWORD || '',
+  password: FIXED_PASSWORD_HASH, // 使用固定密码哈希
   corsOrigin: process.env.CORS_ORIGIN || '*',
   timeout: parseInt(process.env.REQUEST_TIMEOUT || '5000'),
   maxRetries: parseInt(process.env.MAX_RETRIES || '2'),
@@ -123,15 +127,8 @@ function validateProxyAuth(req) {
   const authHash = req.query.auth;
   const timestamp = req.query.t;
   
-  // 获取服务器端密码哈希
-  const serverPassword = config.password;
-  if (!serverPassword) {
-    console.error('服务器未设置 PASSWORD 环境变量，代理访问被拒绝');
-    return false;
-  }
-  
-  // 使用 crypto 模块计算 SHA-256 哈希
-  const serverPasswordHash = crypto.createHash('sha256').update(serverPassword).digest('hex');
+  // 使用固定密码哈希进行验证
+  const serverPasswordHash = FIXED_PASSWORD_HASH;
   
   if (!authHash || authHash !== serverPasswordHash) {
     console.warn('代理请求鉴权失败：密码哈希不匹配');
@@ -238,11 +235,7 @@ app.use((req, res) => {
 // 启动服务器
 app.listen(config.port, () => {
   console.log(`服务器运行在 http://localhost:${config.port}`);
-  if (config.password !== '') {
-    console.log('用户登录密码已设置');
-  } else {
-    console.log('警告: 未设置 PASSWORD 环境变量，用户将被要求设置密码');
-  }
+  console.log('用户登录密码已设置为固定密码: 20220828');
   if (config.debug) {
     console.log('调试模式已启用');
     console.log('配置:', { ...config, password: config.password ? '******' : '' });
