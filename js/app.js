@@ -25,6 +25,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // 渲染搜索历史
     renderSearchHistory();
 
+    // 初始化无限滚动
+    initInfiniteScroll();
+
     // 设置默认API选择（如果是第一次加载）
     if (!localStorage.getItem('hasInitializedDefaults')) {
         // 默认选中资源
@@ -603,8 +606,15 @@ function getCustomApiInfo(customApiIndex) {
     return customAPIs[index];
 }
 
-// 搜索功能 - 修改为支持多选API和多页结果
-async function search() {
+// 无限滚动相关变量
+let currentSearchQuery = '';
+let currentPage = 1;
+let isLoading = false;
+let hasMoreResults = true;
+let allSearchResults = [];
+
+// 搜索功能 - 修改为支持无限滚动
+async function search(isLoadMore = false) {
     // 强化的密码保护校验 - 防止绕过
     try {
         if (window.ensurePasswordProtection) {
@@ -622,42 +632,77 @@ async function search() {
         console.warn('Password protection check failed:', error.message);
         return;
     }
-    const query = document.getElementById('searchInput').value.trim();
-
-    if (!query) {
-        showToast('请输入搜索内容', 'info');
-        return;
+    // 如果是加载更多，使用当前搜索词；否则获取新的搜索词
+    let query;
+    if (isLoadMore) {
+        if (isLoading || !hasMoreResults) {
+            return;
+        }
+        query = currentSearchQuery;
+        isLoading = true;
+    } else {
+        query = document.getElementById('searchInput').value.trim();
+        if (!query) {
+            showToast('请输入搜索内容', 'info');
+            return;
+        }
+        
+        // 重置搜索状态
+        resetSearchState();
+        currentSearchQuery = query;
+        currentPage = 1;
+        hasMoreResults = true;
+        allSearchResults = [];
+        isLoading = true;
     }
 
     if (selectedAPIs.length === 0) {
         showToast('请至少选择一个API源', 'warning');
+        isLoading = false;
         return;
     }
 
-    showLoading();
+    if (!isLoadMore) {
+        showLoading();
+    } else {
+        showLoadingMore();
+    }
 
     try {
         // 保存搜索历史
         saveSearchHistory(query);
 
-        // 从所有选中的API源搜索
-        let allResults = [];
+        // 从所有选中的API源搜索 - 支持分页
+        let pageResults = [];
         const searchPromises = selectedAPIs.map(apiId => 
-            searchByAPIAndKeyWord(apiId, query)
+            searchByAPIAndKeyWordWithPage(apiId, query, currentPage)
         );
 
         // 等待所有搜索请求完成
         const resultsArray = await Promise.all(searchPromises);
 
-        // 合并所有结果
+        // 合并当前页结果
         resultsArray.forEach(results => {
             if (Array.isArray(results) && results.length > 0) {
-                allResults = allResults.concat(results);
+                pageResults = pageResults.concat(results);
             }
         });
 
-        // 对搜索结果进行排序：按名称优先，名称相同时按接口源排序
-        allResults.sort((a, b) => {
+        // 检查是否还有更多结果
+        if (pageResults.length === 0) {
+            hasMoreResults = false;
+            // 显示没有更多结果的提示
+            if (isLoadMore && allSearchResults.length > 0) {
+                showNoMoreResults();
+            }
+        } else {
+            // 将新结果添加到总结果中
+            allSearchResults = allSearchResults.concat(pageResults);
+            currentPage++; // 准备下一页
+        }
+
+        // 只对新获取的页面结果进行排序，避免重新排序整个列表
+        pageResults.sort((a, b) => {
             // 首先按照视频名称排序
             const nameCompare = (a.vod_name || '').localeCompare(b.vod_name || '');
             if (nameCompare !== 0) return nameCompare;
@@ -669,24 +714,27 @@ async function search() {
         // 更新搜索结果计数
         const searchResultsCount = document.getElementById('searchResultsCount');
         if (searchResultsCount) {
-            searchResultsCount.textContent = allResults.length;
+            searchResultsCount.textContent = allSearchResults.length;
         }
 
-        // 显示结果区域，调整搜索区域
-        document.getElementById('searchArea').classList.remove('flex-1');
-        document.getElementById('searchArea').classList.add('mb-8');
-        document.getElementById('resultsArea').classList.remove('hidden');
+        // 只在首次搜索时显示结果区域
+        if (!isLoadMore) {
+            // 显示结果区域，调整搜索区域
+            document.getElementById('searchArea').classList.remove('flex-1');
+            document.getElementById('searchArea').classList.add('mb-8');
+            document.getElementById('resultsArea').classList.remove('hidden');
 
-        // 隐藏豆瓣推荐区域（如果存在）
-        const doubanArea = document.getElementById('doubanArea');
-        if (doubanArea) {
-            doubanArea.classList.add('hidden');
+            // 隐藏豆瓣推荐区域（如果存在）
+            const doubanArea = document.getElementById('doubanArea');
+            if (doubanArea) {
+                doubanArea.classList.add('hidden');
+            }
         }
 
         const resultsDiv = document.getElementById('results');
 
-        // 如果没有结果
-        if (!allResults || allResults.length === 0) {
+        // 如果是首次搜索且没有结果
+        if (!isLoadMore && (!allSearchResults || allSearchResults.length === 0)) {
             resultsDiv.innerHTML = `
                 <div class="col-span-full text-center py-16">
                     <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -698,38 +746,43 @@ async function search() {
                 </div>
             `;
             hideLoading();
+            isLoading = false;
             return;
         }
 
-        // 有搜索结果时，才更新URL
-        try {
-            // 使用URI编码确保特殊字符能够正确显示
-            const encodedQuery = encodeURIComponent(query);
-            // 使用HTML5 History API更新URL，不刷新页面
-            window.history.pushState(
-                { search: query },
-                `搜索: ${query} - LibreTV`,
-                `/s=${encodedQuery}`
-            );
-            // 更新页面标题
-            document.title = `搜索: ${query} - LibreTV`;
-        } catch (e) {
-            console.error('更新浏览器历史失败:', e);
-            // 如果更新URL失败，继续执行搜索
+        // 只在首次搜索时更新URL
+        if (!isLoadMore) {
+            try {
+                // 使用URI编码确保特殊字符能够正确显示
+                const encodedQuery = encodeURIComponent(query);
+                // 使用HTML5 History API更新URL，不刷新页面
+                window.history.pushState(
+                    { search: query },
+                    `搜索: ${query} - LibreTV`,
+                    `/s=${encodedQuery}`
+                );
+                // 更新页面标题
+                document.title = `搜索: ${query} - LibreTV`;
+            } catch (e) {
+                console.error('更新浏览器历史失败:', e);
+                // 如果更新URL失败，继续执行搜索
+            }
         }
 
         // 处理搜索结果过滤：如果启用了黄色内容过滤，则过滤掉分类含有敏感内容的项目
         const yellowFilterEnabled = localStorage.getItem('yellowFilterEnabled') === 'true';
         if (yellowFilterEnabled) {
             const banned = ['伦理片', '福利', '里番动漫', '门事件', '萝莉少女', '制服诱惑', '国产传媒', 'cosplay', '黑丝诱惑', '无码', '日本无码', '有码', '日本有码', 'SWAG', '网红主播', '色情片', '同性片', '福利视频', '福利片'];
-            allResults = allResults.filter(item => {
+            pageResults = pageResults.filter(item => {
                 const typeName = item.type_name || '';
                 return !banned.some(keyword => typeName.includes(keyword));
             });
         }
 
-        // 添加XSS保护，使用textContent和属性转义
-        const safeResults = allResults.map(item => {
+        // 渲染新获取的页面结果
+        if (pageResults.length > 0) {
+            // 添加XSS保护，使用textContent和属性转义
+            const safeResults = pageResults.map(item => {
             const safeId = item.vod_id ? item.vod_id.toString().replace(/[^\w-]/g, '') : '';
             const safeName = (item.vod_name || '').toString()
                 .replace(/</g, '&lt;')
@@ -795,9 +848,15 @@ async function search() {
                     </div>
                 </div>
             `;
-        }).join('');
+            }).join('');
 
-        resultsDiv.innerHTML = safeResults;
+            // 根据是否为加载更多来决定是追加还是替换内容
+            if (isLoadMore) {
+                resultsDiv.insertAdjacentHTML('beforeend', safeResults);
+            } else {
+                resultsDiv.innerHTML = safeResults;
+            }
+        }
     } catch (error) {
         console.error('搜索错误:', error);
         if (error.name === 'AbortError') {
@@ -806,7 +865,123 @@ async function search() {
             showToast('搜索请求失败，请稍后重试', 'error');
         }
     } finally {
-        hideLoading();
+        if (isLoadMore) {
+            hideLoadingMore();
+        } else {
+            hideLoading();
+        }
+        isLoading = false;
+    }
+}
+
+// 显示加载更多指示器
+function showLoadingMore() {
+    let loadingMore = document.getElementById('loadingMore');
+    if (!loadingMore) {
+        // 创建加载更多指示器
+        loadingMore = document.createElement('div');
+        loadingMore.id = 'loadingMore';
+        loadingMore.className = 'col-span-full flex justify-center items-center py-8';
+        loadingMore.innerHTML = `
+            <div class="flex items-center space-x-3 text-gray-400">
+                <div class="w-6 h-6 border-2 border-gray-600 border-t-white rounded-full animate-spin"></div>
+                <span>加载更多内容中...</span>
+            </div>
+        `;
+        document.getElementById('results').appendChild(loadingMore);
+    } else {
+        loadingMore.classList.remove('hidden');
+    }
+}
+
+// 隐藏加载更多指示器
+function hideLoadingMore() {
+    const loadingMore = document.getElementById('loadingMore');
+    if (loadingMore) {
+        loadingMore.classList.add('hidden');
+    }
+}
+
+// 显示没有更多结果的提示
+function showNoMoreResults() {
+    let noMoreResults = document.getElementById('noMoreResults');
+    if (!noMoreResults) {
+        // 创建没有更多结果的提示
+        noMoreResults = document.createElement('div');
+        noMoreResults.id = 'noMoreResults';
+        noMoreResults.className = 'col-span-full flex justify-center items-center py-8';
+        noMoreResults.innerHTML = `
+            <div class="text-gray-500 text-center">
+                <svg class="mx-auto h-8 w-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>已加载全部内容</span>
+            </div>
+        `;
+        document.getElementById('results').appendChild(noMoreResults);
+    } else {
+        noMoreResults.classList.remove('hidden');
+    }
+    
+    // 3秒后自动隐藏提示
+    setTimeout(() => {
+        if (noMoreResults) {
+            noMoreResults.classList.add('hidden');
+        }
+    }, 3000);
+}
+
+// 初始化无限滚动监听器
+function initInfiniteScroll() {
+    let scrollTimeout;
+    let lastTriggerTime = 0;
+    
+    function handleScroll() {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+            // 防止过于频繁的触发（最少间隔1秒）
+            const now = Date.now();
+            if (now - lastTriggerTime < 1000) {
+                return;
+            }
+            
+            // 检查是否接近页面底部
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight;
+            
+            // 当距离底部200px时触发加载更多
+            if (scrollTop + windowHeight >= documentHeight - 200) {
+                if (currentSearchQuery && hasMoreResults && !isLoading && selectedAPIs.length > 0) {
+                    lastTriggerTime = now;
+                    search(true); // 加载更多
+                }
+            }
+        }, 150); // 节流，避免频繁触发
+    }
+    
+    // 移除之前的监听器（如果存在）
+    window.removeEventListener('scroll', handleScroll);
+    // 添加新的监听器
+    window.addEventListener('scroll', handleScroll, { passive: true });
+}
+
+// 重置搜索状态（在开始新搜索时调用）
+function resetSearchState() {
+    currentSearchQuery = '';
+    currentPage = 1;
+    isLoading = false;
+    hasMoreResults = true;
+    allSearchResults = [];
+    
+    // 清理已有的提示元素
+    const loadingMore = document.getElementById('loadingMore');
+    const noMoreResults = document.getElementById('noMoreResults');
+    if (loadingMore) {
+        loadingMore.remove();
+    }
+    if (noMoreResults) {
+        noMoreResults.remove();
     }
 }
 

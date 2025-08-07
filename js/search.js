@@ -1,3 +1,71 @@
+// 支持分页的单页搜索函数
+async function searchByAPIAndKeyWordWithPage(apiId, query, page = 1) {
+    try {
+        let apiUrl, apiName, apiBaseUrl;
+        
+        // 处理自定义API
+        if (apiId.startsWith('custom_')) {
+            const customIndex = apiId.replace('custom_', '');
+            const customApi = getCustomApiInfo(customIndex);
+            if (!customApi) return [];
+            
+            apiBaseUrl = customApi.url;
+            // 使用分页路径
+            apiUrl = apiBaseUrl + API_CONFIG.search.pagePath
+                .replace('{query}', encodeURIComponent(query))
+                .replace('{page}', page);
+            apiName = customApi.name;
+        } else {
+            // 内置API
+            if (!API_SITES[apiId]) return [];
+            apiBaseUrl = API_SITES[apiId].api;
+            // 使用分页路径
+            apiUrl = apiBaseUrl + API_CONFIG.search.pagePath
+                .replace('{query}', encodeURIComponent(query))
+                .replace('{page}', page);
+            apiName = API_SITES[apiId].name;
+        }
+        
+        // 添加超时处理
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        
+        // 添加鉴权参数到代理URL
+        const proxiedUrl = await window.ProxyAuth?.addAuthToProxyUrl ? 
+            await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(apiUrl)) :
+            PROXY_URL + encodeURIComponent(apiUrl);
+        
+        const response = await fetch(proxiedUrl, {
+            headers: API_CONFIG.search.headers,
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            return [];
+        }
+        
+        const data = await response.json();
+        
+        if (!data || !data.list || !Array.isArray(data.list) || data.list.length === 0) {
+            return [];
+        }
+        
+        // 返回单页结果
+        return data.list.map(item => ({
+            ...item,
+            source_name: apiName,
+            source_code: apiId,
+            api_url: apiId.startsWith('custom_') ? getCustomApiInfo(apiId.replace('custom_', ''))?.url : undefined
+        }));
+        
+    } catch (error) {
+        console.error(`API ${apiId} 第${page}页搜索失败:`, error);
+        return [];
+    }
+}
+
 async function searchByAPIAndKeyWord(apiId, query) {
     try {
         let apiUrl, apiName, apiBaseUrl;
