@@ -4,11 +4,20 @@
   <img src="image/logo.png" alt="LibreTV Logo" width="120">
   <br>
   <p><strong>自由观影，畅享精彩</strong></p>
+  <p><strong>🚀 现已支持无限滚动搜索体验</strong></p>
 </div>
 
 ## 📺 项目简介
 
-LibreTV 是一个轻量级、免费的在线视频搜索与观看平台，提供来自多个视频源的内容搜索与播放服务。无需注册，即开即用，支持多种设备访问。项目结合了前端技术和后端代理功能，可部署在支持服务端功能的各类网站托管服务上。**项目门户**： [libretv.is-an.org](https://libretv.is-an.org)
+LibreTV 是一个轻量级、免费的在线视频搜索与观看平台，提供来自多个视频源的内容搜索与播放服务。无需注册，即开即用，支持多种设备访问。
+
+### 🌟 最新特性
+- ✅ **无限滚动搜索** - 类似抖音、微博的沉浸式浏览体验
+- ✅ **智能加载** - 距离底部200px自动加载更多内容
+- ✅ **性能优化** - 防抖机制和状态管理
+- ✅ **多平台部署** - 支持 Cloudflare Workers、Vercel、Netlify 等
+
+**在线预览**： [https://libretv.xinhangsu.workers.dev](https://libretv.xinhangsu.workers.dev)
 
 本项目基于 [bestK/tv](https://github.com/bestK/tv) 进行重构与增强。
 
@@ -19,11 +28,30 @@ LibreTV 是一个轻量级、免费的在线视频搜索与观看平台，提供
 
 ## 🚀 快速部署
 
-选择以下任一平台，点击一键部署按钮，即可快速创建自己的 LibreTV 实例：
+### ⚡ 一键部署脚本（推荐）
+```bash
+# 克隆项目
+git clone https://github.com/suxinhang/LibreTV.git
+cd LibreTV
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FLibreSpark%2FLibreTV)  
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/LibreSpark/LibreTV)  
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/LibreSpark/LibreTV)
+# 运行一键部署脚本
+./deploy.sh
+```
+
+### 🌟 一键部署按钮
+选择以下任一平台，点击按钮即可快速部署：
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fsuxinhang%2FLibreTV)  
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/suxinhang/LibreTV)
+
+### 🔥 Cloudflare Workers 部署（推荐）
+```bash
+# 直接部署到全球CDN
+npx wrangler deploy
+
+# 设置访问密码
+npx wrangler secret put PASSWORD
+```
 
 ## 🚨 重要声明
 
