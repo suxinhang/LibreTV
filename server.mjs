@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 
 // 固定密码配置
 const FIXED_PASSWORD = '20220828';
-const FIXED_PASSWORD_HASH = 'f0e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b';
+const FIXED_PASSWORD_HASH = '02b4e371d4794b9cb2c394ba8079935913463bacacdfbdaa5c6d132dd9e0ef9a';
 
 const config = {
   port: process.env.PORT || 8080,
@@ -56,11 +56,10 @@ function sha256Hash(input) {
   });
 }
 
-async function renderPage(filePath, password) {
+async function renderPage(filePath, passwordHash) {
   let content = fs.readFileSync(filePath, 'utf8');
-  if (password !== '') {
-    const sha256 = await sha256Hash(password);
-    content = content.replace('{{PASSWORD}}', sha256);
+  if (passwordHash !== '') {
+    content = content.replace('{{PASSWORD}}', passwordHash);
   } else {
     content = content.replace('{{PASSWORD}}', '');
   }

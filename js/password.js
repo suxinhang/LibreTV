@@ -1,7 +1,7 @@
 // 密码保护功能
 
 // 固定密码 (SHA-256 哈希值)
-const FIXED_PASSWORD_HASH = 'f0e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b'; // 20220828
+const FIXED_PASSWORD_HASH = '02b4e371d4794b9cb2c394ba8079935913463bacacdfbdaa5c6d132dd9e0ef9a'; // 20220828
 
 /**
  * 检查是否设置了密码保护
@@ -14,10 +14,10 @@ function isPasswordProtected() {
 
 /**
  * 检查是否强制要求设置密码
- * 始终要求密码验证
+ * 使用固定密码，无需设置环境变量
  */
 function isPasswordRequired() {
-    return !isPasswordVerified();
+    return false; // 固定密码已设置，无需提示
 }
 
 /**
@@ -25,11 +25,7 @@ function isPasswordRequired() {
  * 在关键操作前都应该调用此函数
  */
 function ensurePasswordProtection() {
-    if (isPasswordRequired()) {
-        showPasswordModal();
-        throw new Error('Password protection is required');
-    }
-    if (isPasswordProtected() && !isPasswordVerified()) {
+    if (!isPasswordVerified()) {
         showPasswordModal();
         throw new Error('Password verification required');
     }
