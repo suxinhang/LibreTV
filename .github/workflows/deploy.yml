@@ -43,17 +43,21 @@ jobs:
         run: |
           # 确保.env文件存在
           if [ ! -f .env ]; then
-            cp .env.example .env || echo "PASSWORD=demo123" > .env
+            cp .env.example .env 2>/dev/null || echo "PASSWORD=demo123" > .env
           fi
           
-          # 创建构建目录
+          # 创建构建目录并设置权限
           mkdir -p dist
+          chmod 755 dist
           
-          # 复制所有静态文件
-          cp -r css js libs image *.html *.json *.txt dist/
-          
-          # 复制根目录文件
+          # 复制所有静态文件并设置正确权限
+          cp -r css js libs image *.html dist/ 2>/dev/null || true
+          cp *.json *.txt dist/ 2>/dev/null || true
           cp robots.txt manifest.json dist/ 2>/dev/null || true
+          
+          # 确保所有文件权限正确
+          find dist -type f -exec chmod 644 {} \;
+          find dist -type d -exec chmod 755 {} \;
           
           echo "构建完成，文件列表："
           ls -la dist/
