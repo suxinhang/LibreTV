@@ -1,0 +1,28 @@
+# Netlify 部署配置
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+# Edge Functions
+[[edge_functions]]
+  function = "inject-env"
+  path = "/*"
+
+# 重写规则
+[[redirects]]
+  from = "/proxy/*"
+  to = "/.netlify/functions/proxy/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/s=*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/api/proxy/*"
+  to = "/.netlify/functions/proxy/:splat"
+  status = 200
+
+# 环境变量（在 Netlify Dashboard 设置）
+# PASSWORD = "你的密码"

@@ -107,23 +107,92 @@ async function handleStatic(request: Request, env: Env): Promise<Response> {
 // 获取静态资源
 async function fetchAsset(path: string): Promise<Response> {
   try {
-    // 这里需要根据实际的静态文件处理方式调整
-    // 在 Workers 中，通常需要将静态文件上传到 KV 或使用 Assets
-    const asset = await fetch(`https://your-asset-domain.com${path}`);
-    
-    if (!asset.ok) {
-      return new Response('File not found', { status: 404 });
+    // 在新版本的 Wrangler 中，静态资源通过 Assets 自动处理
+    // 这里我们提供一个简单的响应用于测试
+    if (path === '/' || path === '/index.html') {
+      return new Response(getIndexHTML(), {
+        headers: {
+          'Content-Type': 'text/html',
+          'Cache-Control': 'public, max-age=3600',
+        },
+      });
     }
     
-    return new Response(asset.body, {
-      headers: {
-        'Content-Type': getContentType(path),
-        'Cache-Control': 'public, max-age=3600',
-      },
-    });
+    // 对于其他静态文件，返回404
+    return new Response('File not found', { status: 404 });
   } catch (error) {
     return new Response('Internal server error', { status: 500 });
   }
+}
+
+// 生成基本的HTML页面
+function getIndexHTML(): string {
+  return `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LibreTV - Cloudflare Workers</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0a0a;
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            max-width: 600px;
+        }
+        .logo {
+            font-size: 3em;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .message {
+            font-size: 1.2em;
+            margin-bottom: 30px;
+            color: #ccc;
+        }
+        .status {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .success {
+            color: #4ade80;
+        }
+        .info {
+            color: #60a5fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">📺 LibreTV</div>
+        <div class="message">Cloudflare Workers 部署成功！</div>
+        <div class="status">
+            <div class="success">✅ Worker 运行正常</div>
+            <div class="info">🚀 支持无限滚动搜索</div>
+            <div class="info">🌐 全球CDN加速</div>
+        </div>
+        <p>请注意：当前为简化版本，完整功能请使用静态文件部署。</p>
+        <p>访问完整版本：<a href="https://github.com/suxinhang/LibreTV" style="color: #60a5fa;">GitHub仓库</a></p>
+    </div>
+</body>
+</html>
+  `;
 }
 
 // 获取文件MIME类型
